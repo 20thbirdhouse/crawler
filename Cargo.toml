@@ -1,0 +1,13 @@
+[package]
+name = "crawler"
+version = "1.0.0"
+authors = ["thatlittlegit <wapidstyle@live.ca>"]
+
+[dependencies]
+reqwest = "0.8.5"
+regex = "0.2.10"
+htmlstream = "0.1.3"
+robotparser = "0.10"
+url = "1.7.0"
+log = "0.4.1"
+env_logger = "0.5.6"
