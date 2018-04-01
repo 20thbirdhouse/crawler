@@ -87,6 +87,11 @@ fn find_urls_in_url(client: &Client, url: &String) -> Vec<String> {
                                 || found_url.chars().nth(0).unwrap() == '?'
                             {
                                 found_url = String::from("NO_OPERATION");
+                            } else if found_url.chars().nth(0).unwrap().to_string() == "." {
+                                let parsed_main_url = Url::parse(url).unwrap();
+                                found_url = String::from(
+                                    parsed_main_url.join(&found_url).unwrap().as_str(),
+                                );
                             } else if found_url.chars().nth(0).unwrap().to_string() == "/" {
                                 let mut modified_url = String::from("");
 
