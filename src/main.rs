@@ -144,6 +144,7 @@ fn check_if_is_in_url_list(object: &str, array: &Vec<String>) -> bool {
     debug!("not found, insert {}", object);
     return true;
 }
+
 fn find_in_robot_cache<'a>(
     object: &str,
     array: Vec<(String, RobotFileParser<'a>)>,
@@ -177,6 +178,7 @@ fn main() {
     let mut future_url_buffer: Vec<String> =
         find_urls_in_url(&client, &std::env::args().nth(1).unwrap());
     let mut robots_cache: Vec<(String, RobotFileParser)> = Vec::new();
+    let mut fetched_cache: Vec<String> = Vec::new();
 
     loop {
         future_urls = future_url_buffer.clone();
@@ -186,6 +188,14 @@ fn main() {
             debug!("url = {}", url);
             let parsed_url = Url::parse(&url).unwrap();
             let mut hostname = String::from(parsed_url.host_str().unwrap()); // TODO Merge with previous line
+
+            if !check_if_is_in_url_list(&url, &fetched_cache) {
+                info!("==> Skipping {} (already fetched)", url);
+                continue;
+            } else {
+                fetched_cache.push(url.clone());
+            }
+
             let mut original_hostname = hostname.clone();
 
             let mut _robotsok = find_in_robot_cache(&hostname, robots_cache.clone());
