@@ -1,19 +1,14 @@
-extern crate reqwest;
-//extern crate regex;
+extern crate env_logger;
 extern crate htmlstream;
+#[macro_use]
+extern crate log;
+extern crate reqwest;
 extern crate robotparser;
 extern crate url;
-#[macro_use] extern crate log;
-extern crate env_logger;
 
 use reqwest::Client;
-//use regex::Regex;
 use robotparser::RobotFileParser;
 use url::Url;
-
-//fn email_regex() -> Regex {
-//    return Regex::new("@^(https?|ftp)://[^\\s/$.?#].[^\\s]*$@iS").unwrap();
-//}
 
 fn get_attribute_for_elem(elem: &str) -> String {
     match elem {
@@ -62,11 +57,7 @@ fn get_main_domain(url: &str) -> Option<String> {
     }
 }
 
-fn find_urls_in_url (/*regex: &Regex, */client: &Client, url: &String) -> Vec<String> {
-//    if Url::parse(url).unwrap().cannot_be_a_base() {
-//        return Vec::new();
-//    }
-
+fn find_urls_in_url(client: &Client, url: &String) -> Vec<String> {
     if url.contains(".js") {
         return Vec::new();
     }
@@ -81,13 +72,20 @@ fn find_urls_in_url (/*regex: &Regex, */client: &Client, url: &String) -> Vec<St
                     if attribute_set.contains("=") {
                         let mut attribute_splitted = attribute_set.split("=\"");
                         if String::from(attribute_splitted.next().unwrap()) == attribute_name {
-                            let mut found_url = String::from(attribute_splitted.next().unwrap()).replace("\n", "").split("#").nth(0).unwrap().to_string();
+                            let mut found_url = String::from(attribute_splitted.next().unwrap())
+                                .replace("\n", "")
+                                .split("#")
+                                .nth(0)
+                                .unwrap()
+                                .to_string();
                             for found_url_part in attribute_splitted.next() {
                                 found_url.push_str(found_url_part);
                             }
                             found_url.pop(); // Remove final quote
 
-                            if found_url.chars().nth(0) == None || found_url.chars().nth(0).unwrap() == '?' {
+                            if found_url.chars().nth(0) == None
+                                || found_url.chars().nth(0).unwrap() == '?'
+                            {
                                 found_url = String::from("NO_OPERATION");
                             } else if found_url.chars().nth(0).unwrap().to_string() == "/" {
                                 let mut modified_url = String::from("");
@@ -109,12 +107,18 @@ fn find_urls_in_url (/*regex: &Regex, */client: &Client, url: &String) -> Vec<St
                                 found_url = modified_url;
                             }
                             trace!("found url in {} => {}", url, found_url);
-                            if found_url != "NO_OPERATION" && check_if_is_in_url_list(&found_url, &returned_vec){
+                            if found_url != "NO_OPERATION"
+                                && check_if_is_in_url_list(&found_url, &returned_vec)
+                            {
                                 returned_vec.push(found_url.clone());
 
                                 let main_domain = get_main_domain(&found_url.clone());
-                                
-                                if main_domain != None && check_if_is_in_url_list(&main_domain.clone().unwrap(), &returned_vec) {
+
+                                if main_domain != None
+                                    && check_if_is_in_url_list(
+                                        &main_domain.clone().unwrap(),
+                                        &returned_vec,
+                                    ) {
                                     returned_vec.push(main_domain.unwrap());
                                 }
                             }
@@ -140,7 +144,10 @@ fn check_if_is_in_url_list(object: &str, array: &Vec<String>) -> bool {
     debug!("not found, insert {}", object);
     return true;
 }
-fn find_in_robot_cache<'a> (object: &str, array: Vec<(String, RobotFileParser<'a>)>) -> Option<(String, RobotFileParser<'a>)> {
+fn find_in_robot_cache<'a>(
+    object: &str,
+    array: Vec<(String, RobotFileParser<'a>)>,
+) -> Option<(String, RobotFileParser<'a>)> {
     trace!("finding {} in robot_cache", object);
     for entry in array {
         trace!("discovered {} in robot_cache", entry.0);
@@ -167,7 +174,8 @@ fn main() {
     let mut future_urls: Vec<String>;
 
     info!("fetching {}!", &std::env::args().nth(1).unwrap());
-    let mut future_url_buffer: Vec<String> = find_urls_in_url(/*&email_regex(), */&client, &std::env::args().nth(1).unwrap());
+    let mut future_url_buffer: Vec<String> =
+        find_urls_in_url(&client, &std::env::args().nth(1).unwrap());
     let mut robots_cache: Vec<(String, RobotFileParser)> = Vec::new();
 
     loop {
@@ -210,5 +218,4 @@ fn main() {
             }
         }
     }
-
 }
