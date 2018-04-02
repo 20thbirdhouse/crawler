@@ -57,7 +57,7 @@ fn get_main_domain(url: &str) -> Option<String> {
     }
 }
 
-fn find_urls_in_url(client: &Client, url: &String) -> Vec<String> {
+fn find_urls_in_url(client: &Client, url: &String, fetched_cache: &Vec<String>) -> Vec<String> {
     if url.contains(".js") {
         return Vec::new();
     }
@@ -111,10 +111,11 @@ fn find_urls_in_url(client: &Client, url: &String) -> Vec<String> {
                                 modified_url.push_str(&found_url);
                                 found_url = modified_url;
                             }
-                            trace!("found url in {} => {}", url, found_url);
                             if found_url != "NO_OPERATION"
                                 && check_if_is_in_url_list(&found_url, &returned_vec)
+                                && check_if_is_in_url_list(&found_url, &fetched_cache)
                             {
+                                trace!("found url in {} => {}", url, found_url);
                                 returned_vec.push(found_url.clone());
 
                                 let main_domain = get_main_domain(&found_url.clone());
@@ -181,7 +182,7 @@ fn main() {
 
     info!("fetching {}!", &std::env::args().nth(1).unwrap());
     let mut future_url_buffer: Vec<String> =
-        find_urls_in_url(&client, &std::env::args().nth(1).unwrap());
+        find_urls_in_url(&client, &std::env::args().nth(1).unwrap(), &Vec::new());
     let mut robots_cache: Vec<(String, RobotFileParser)> = Vec::new();
     let mut fetched_cache: Vec<String> = Vec::new();
 
@@ -230,7 +231,7 @@ fn main() {
 
             if robotsok.1.can_fetch("twentiethcrawler", &url) {
                 info!("fetching {}!", url);
-                &mut future_url_buffer.append(&mut find_urls_in_url(&client, &url));
+                &mut future_url_buffer.append(&mut find_urls_in_url(&client, &url, &fetched_cache));
             } else {
                 warn!("ignoring {} (forbidden by robots.txt)", url);
             }
