@@ -20,12 +20,12 @@ fn get_attribute_for_elem(elem: &str) -> String {
     }
 }
 
-fn get_main_domain(url: &str) -> Option<String> {
-    debug!("getting main domain for {}", url);
+fn get_root_domain(url: &str) -> Option<String> {
+    debug!("getting root domain for {}", url);
     let _parsed_url = Url::parse(url);
 
     if _parsed_url.is_err() {
-        warn!("failed to parse URL in get_main_domain ({})", url);
+        warn!("failed to parse URL in get_root_domain ({})", url);
         return None;
     }
 
@@ -33,7 +33,7 @@ fn get_main_domain(url: &str) -> Option<String> {
     let hostname = parsed_url.host_str();
     if hostname == None {
         warn!(
-            "failed to find hostname for URL in get_main_domain ({})",
+            "failed to find hostname for URL in get_root_domain ({})",
             url
         );
         return None;
@@ -43,7 +43,7 @@ fn get_main_domain(url: &str) -> Option<String> {
 
     if subdomainless_hostname == None {
         warn!(
-            "invalid URL (likely missing TLD) passed to get_main_domain ({})",
+            "invalid URL (likely missing TLD) passed to get_root_domain ({})",
             url
         );
         return None;
@@ -121,7 +121,7 @@ fn find_urls_in_url(client: &Client, url: &String, fetched_cache: &Vec<String>) 
                                 trace!("found url in {} => {}", url, found_url);
                                 returned_vec.push(found_url.clone());
 
-                                let main_domain = get_main_domain(&found_url.clone());
+                                let main_domain = get_root_domain(&found_url.clone());
 
                                 if main_domain != None
                                     && check_if_is_in_url_list(
