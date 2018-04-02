@@ -23,26 +23,29 @@ fn get_attribute_for_elem(elem: &str) -> String {
 fn get_main_domain(url: &str) -> Option<String> {
     debug!("getting main domain for {}", url);
     let _parsed_url = Url::parse(url);
-    let parsed_url;
 
     if _parsed_url.is_err() {
-        warn!("invalid URL passed to get_main_domain ({})", url);
-        return None;
-    } else {
-        parsed_url = _parsed_url.unwrap();
-    }
-
-    let _hostname = parsed_url.host_str();
-
-    if _hostname == None {
-        warn!("invalid URL passed to get_main_domain ({})", url);
+        warn!("failed to parse URL in get_main_domain ({})", url);
         return None;
     }
 
-    let hostname = _hostname.unwrap().splitn(2, '.').nth(1);
-
+    let parsed_url = _parsed_url.unwrap();
+    let hostname = parsed_url.host_str();
     if hostname == None {
-        warn!("invalid URL passed to get_main_domain ({})", url);
+        warn!(
+            "failed to find hostname for URL in get_main_domain ({})",
+            url
+        );
+        return None;
+    }
+
+    let subdomainless_hostname = hostname.unwrap().splitn(2, '.').nth(1);
+
+    if subdomainless_hostname == None {
+        warn!(
+            "invalid URL (likely missing TLD) passed to get_main_domain ({})",
+            url
+        );
         return None;
     } else if hostname.unwrap().contains('.') {
         let mut ret = String::from(parsed_url.scheme());
@@ -52,7 +55,7 @@ fn get_main_domain(url: &str) -> Option<String> {
         debug!("found {} to be main domain!", ret);
         return Some(String::from(ret));
     } else {
-        debug!("{} is main domain, ignore", _hostname.unwrap());
+        debug!("{} is main domain, ignore", hostname.unwrap());
         return None;
     }
 }
