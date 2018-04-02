@@ -214,13 +214,16 @@ fn main() {
 
             if _robotsok == None {
                 if robots_cache.len() > 512 {
+                    debug!("clearing robots_cache");
                     robots_cache.clear();
                 }
 
+                debug!("fetching robots.txt, aka {}", hostname);
                 let robotstxt = RobotFileParser::new(&hostname);
                 robotstxt.read();
                 robotsok = (String::from(original_hostname), robotstxt);
                 robots_cache.push(robotsok.clone());
+                debug!("finished, in cache");
             } else {
                 robotsok = _robotsok.unwrap();
             }
