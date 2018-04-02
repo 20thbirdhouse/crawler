@@ -60,84 +60,149 @@ fn get_root_domain(url: &str) -> Option<String> {
     }
 }
 
-fn find_urls_in_url(client: &Client, url: &String, fetched_cache: &Vec<String>) -> Vec<String> {
-    if url.contains(".js") {
-        return Vec::new();
+fn add_urls_to_vec(urls: Option<Vec<String>>, into: &mut Vec<String>, cache: &Vec<String>) {
+    if urls != None {
+        for url in urls.unwrap() {
+            if check_if_is_in_url_list(&url, &into) && check_if_is_in_url_list(&url, &cache) {
+                trace!("found url {}", url);
+                into.push(url);
+            } else {
+                trace!("found duplicate url {}", url);
+            }
+        }
     }
+}
 
-    let mut returned_vec: Vec<String> = Vec::new();
+fn find_urls_in_html(
+    original_url: &Url,
+    html: htmlstream::HTMLTagIterator,
+    fetched_cache: &Vec<String>,
+) -> Vec<String> {
+    let mut returned_vec = Vec::new();
 
-    for (_pos, tag) in htmlstream::tag_iter(&client.get(url).send().unwrap().text().unwrap()) {
-        if tag.state == htmlstream::HTMLTagState::Opening {
+    for (_pos, tag) in html {
+        if tag.state == htmlstream::HTMLTagState::Opening && tag.attributes != "" {
             let attribute_name = get_attribute_for_elem(&tag.name);
-            if attribute_name != String::from("NO_OPERATION") && tag.attributes != "" {
-                for attribute_set in tag.attributes.split(" ") {
-                    if attribute_set.contains("=") {
-                        let mut attribute_splitted = attribute_set.split("=\"");
-                        if String::from(attribute_splitted.next().unwrap()) == attribute_name {
-                            let mut found_url = String::from(attribute_splitted.next().unwrap())
-                                .replace("\n", "")
-                                .split("#")
-                                .nth(0)
-                                .unwrap()
-                                .to_string();
-                            for found_url_part in attribute_splitted.next() {
-                                found_url.push_str(found_url_part);
-                            }
-                            found_url.pop(); // Remove final quote
 
-                            if found_url.chars().nth(0) == None
-                                || found_url.chars().nth(0).unwrap() == '?'
-                            {
-                                found_url = String::from("NO_OPERATION");
-                            } else if found_url.chars().nth(0).unwrap().to_string() == "." {
-                                let parsed_main_url = Url::parse(url).unwrap();
-                                found_url = String::from(
-                                    parsed_main_url.join(&found_url).unwrap().as_str(),
-                                );
-                            } else if found_url.chars().nth(0).unwrap().to_string() == "/" {
-                                let mut modified_url = String::from("");
+            if attribute_name == "NO_OPERATION" {
+                continue;
+            }
 
-                                if found_url == "/" {
-                                    let parsed_url = Url::parse(url).unwrap();
-                                    modified_url.push_str(parsed_url.scheme());
-                                    modified_url.push_str("://");
-                                    modified_url.push_str(parsed_url.host_str().unwrap());
-                                } else if found_url.chars().nth(1).unwrap().to_string() == "//" {
-                                    modified_url.push_str("https:");
-                                } else {
-                                    let parsed_url = Url::parse(url).unwrap();
-                                    modified_url.push_str(parsed_url.scheme());
-                                    modified_url.push_str("://");
-                                    modified_url.push_str(parsed_url.host_str().unwrap());
-                                }
-                                modified_url.push_str(&found_url);
-                                found_url = modified_url;
-                            }
-                            if found_url != "NO_OPERATION"
-                                && check_if_is_in_url_list(&found_url, &returned_vec)
-                                && check_if_is_in_url_list(&found_url, &fetched_cache)
-                            {
-                                trace!("found url in {} => {}", url, found_url);
-                                returned_vec.push(found_url.clone());
+            for attribute_set in tag.attributes.split(" ") {
+                if attribute_set.contains("=") {
+                    let mut attribute_splitted = attribute_set.split("=\"");
 
-                                let main_domain = get_root_domain(&found_url.clone());
-
-                                if main_domain != None
-                                    && check_if_is_in_url_list(
-                                        &main_domain.clone().unwrap(),
-                                        &returned_vec,
-                                    ) {
-                                    returned_vec.push(main_domain.unwrap());
-                                }
-                            }
-                        }
+                    if attribute_splitted.nth(0).unwrap() == attribute_name {
+                        let mut attribute_splitted_collection: Vec<&str> =
+                            attribute_splitted.collect();
+                        add_urls_to_vec(
+                            repair_suggested_url(original_url, attribute_splitted_collection),
+                            &mut returned_vec,
+                            fetched_cache,
+                        );
                     }
                 }
             }
         }
     }
+
     return returned_vec;
+}
+
+fn repair_suggested_url(original_url: &Url, attribute_splitted: Vec<&str>) -> Option<Vec<String>> {
+    let mut returned_vec: Vec<String> = Vec::new();
+    let mut found_url = attribute_splitted[0]
+        .replace("\n", "")
+        .split("#")
+        .nth(0)
+        .unwrap()
+        .to_string();
+
+    // Some urls contain an =, particularly in GET parameters.
+    // This accounts for them.
+    let mut current = 0;
+    for found_url_part in attribute_splitted {
+        current += 1;
+
+        if current > 1 {
+            // Ensure current > 1 so we don't get duplicates in the path
+            found_url.push_str(found_url_part);
+        }
+    }
+
+    if found_url.len() == 0 || found_url.len() == 1 {
+        return None;
+    }
+
+    // Remove the final quote.
+    found_url.pop();
+
+    let mut parsed_found_url;
+
+    if found_url.starts_with(".") || found_url.starts_with("?") {
+        parsed_found_url = original_url.join(&found_url).unwrap();
+    } else if found_url.starts_with("/") {
+        if found_url.chars().nth(1).unwrap_or(' ') != '/' {
+            parsed_found_url = original_url.clone();
+            parsed_found_url.set_path("/");
+        } else if found_url.starts_with("//") {
+            let mut modified_url = "".to_string();
+            modified_url.push_str("https:");
+            modified_url.push_str(&found_url);
+            parsed_found_url = Url::parse(&modified_url).unwrap();
+        } else {
+            warn!("strange url found: {}", found_url);
+            return None;
+        }
+    } else {
+        let _parsed_found_url = Url::parse(&found_url);
+
+        if _parsed_found_url.is_err() {
+            warn!("strange url found: {}", found_url);
+            return None;
+        }
+        parsed_found_url = _parsed_found_url.unwrap();
+    }
+
+    returned_vec.push(parsed_found_url.as_str().to_string());
+
+    let main_domain = get_root_domain(parsed_found_url.as_str());
+    if main_domain != None {
+        returned_vec.push(main_domain.unwrap());
+    }
+
+    return Some(returned_vec);
+}
+
+fn crawl_page(
+    url: &str,
+    headers: &reqwest::header::Headers,
+    _text: Result<String, reqwest::Error>,
+    cache: &Vec<String>,
+) -> Option<Vec<String>> {
+    let _content_type = headers.get::<reqwest::header::ContentType>();
+
+    if _content_type == None {
+        warn!("no Content-Type for {}", url);
+        return None;
+    }
+    let content_type = _content_type.unwrap().subtype();
+
+    if _text.is_err() {
+        warn!("error getting text for {} ({:?})", url, _text);
+        return None;
+    }
+    let text = _text.unwrap();
+
+    if content_type == reqwest::mime::HTML {
+        return Some(find_urls_in_html(
+            &Url::parse(url).unwrap(),
+            htmlstream::tag_iter(text.as_str()),
+            cache,
+        ));
+    }
+
+    return None;
 }
 
 fn check_if_is_in_url_list(object: &str, array: &Vec<String>) -> bool {
@@ -183,9 +248,7 @@ fn main() {
     let client = Client::new();
     let mut future_urls: Vec<String>;
 
-    info!("fetching {}!", &std::env::args().nth(1).unwrap());
-    let mut future_url_buffer: Vec<String> =
-        find_urls_in_url(&client, &std::env::args().nth(1).unwrap(), &Vec::new());
+    let mut future_url_buffer: Vec<String> = vec![std::env::args().nth(1).unwrap().to_string()];
     let mut robots_cache: Vec<(String, RobotFileParser)> = Vec::new();
     let mut fetched_cache: Vec<String> = Vec::new();
 
@@ -234,7 +297,20 @@ fn main() {
 
             if robotsok.1.can_fetch("twentiethcrawler", &url) {
                 info!("fetching {}!", url);
-                &mut future_url_buffer.append(&mut find_urls_in_url(&client, &url, &fetched_cache));
+                let response = client.get(&url).send();
+
+                if response.is_err() {
+                    warn!("request to {} failed: {:?}", url, response);
+                } else {
+                    let mut response = response.unwrap();
+                    let text = response.text();
+                    let mut found_urls =
+                        crawl_page(&url, &response.headers(), text, &fetched_cache);
+
+                    if found_urls != None {
+                        future_url_buffer.append(&mut found_urls.unwrap());
+                    }
+                }
             } else {
                 warn!("ignoring {} (forbidden by robots.txt)", url);
             }
