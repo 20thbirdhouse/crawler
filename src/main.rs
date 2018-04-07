@@ -1,7 +1,10 @@
 extern crate env_logger;
 extern crate htmlstream;
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate log;
+extern crate regex;
 extern crate reqwest;
 extern crate robotparser;
 extern crate url;
@@ -179,7 +182,7 @@ fn crawl_page(
     headers: &reqwest::header::Headers,
     _text: Result<String, reqwest::Error>,
     cache: &Vec<String>,
-) -> Option<Vec<String>> {
+) -> Option<(Vec<String>, bool)> {
     let _content_type = headers.get::<reqwest::header::ContentType>();
 
     if _content_type == None {
@@ -195,10 +198,60 @@ fn crawl_page(
     let text = _text.unwrap();
 
     if content_type == reqwest::mime::HTML {
-        return Some(find_urls_in_html(
-            &Url::parse(url).unwrap(),
-            htmlstream::tag_iter(text.as_str()),
-            cache,
+        trace!("Started parsing html...");
+        let html = htmlstream::tag_iter(text.as_str());
+        trace!("Finished!");
+        let mut index_url = true;
+
+        lazy_static! {
+            static ref ROBOTS_REGEX: regex::Regex = regex::Regex::new(".*name=.(robots|twentiethbot)..*").unwrap();
+        }
+
+        for (_pos, tag) in html {
+            if (tag.state == htmlstream::HTMLTagState::Opening
+                || tag.state == htmlstream::HTMLTagState::SelfClosing)
+                && tag.name == "meta" && ROBOTS_REGEX.is_match(&tag.attributes)
+            {
+                for attribute_set in tag.attributes.split(" ") {
+                    let mut attribute_split = attribute_set.split("=\"");
+                    let mut _robotsvalue = attribute_split.nth(1);
+                    if attribute_split.clone().count() == 1 || _robotsvalue.unwrap_or("").len() == 0
+                        || _robotsvalue == None
+                    {
+                        debug!(
+                            "Odd <meta> tag on {}: {} (attribute_set={:?})",
+                            url, tag.html, attribute_set
+                        );
+                        continue;
+                    } else if !attribute_set.starts_with("content") {
+                        continue;
+                    }
+                    let mut robotsvalue = _robotsvalue.unwrap().to_string();
+
+                    if robotsvalue.ends_with("\"") || robotsvalue.ends_with("\"") {
+                        robotsvalue.pop();
+                    }
+
+                    for robots_command in robotsvalue.split(",").map(|x| x.to_lowercase()) {
+                        if robots_command == "nofollow" {
+                            return None;
+                        } else if robots_command == "noindex" {
+                            index_url = false;
+                        }
+                        // Other values, like noodp and noarchive/nocache, are currently
+                        // irrelevant.
+                    }
+                }
+            }
+        }
+
+        return Some((
+            find_urls_in_html(
+                &Url::parse(url).unwrap(),
+                htmlstream::tag_iter(text.as_str()),
+                cache,
+            ),
+            index_url,
         ));
     }
 
@@ -304,11 +357,12 @@ fn main() {
                 } else {
                     let mut response = response.unwrap();
                     let text = response.text();
-                    let mut found_urls =
+                    let mut _found_urls =
                         crawl_page(&url, &response.headers(), text, &fetched_cache);
 
-                    if found_urls != None {
-                        future_url_buffer.append(&mut found_urls.unwrap());
+                    if _found_urls != None {
+                        let mut found_urls = _found_urls.unwrap();
+                        future_url_buffer.append(&mut found_urls.0);
                     }
                 }
             } else {
