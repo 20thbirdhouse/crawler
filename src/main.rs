@@ -304,6 +304,7 @@ fn main() {
     let mut future_url_buffer: Vec<String> = vec![std::env::args().nth(1).unwrap().to_string()];
     let mut robots_cache: Vec<(String, RobotFileParser)> = Vec::new();
     let mut fetched_cache: Vec<String> = Vec::new();
+    let mut all_found_urls: Vec<String> = Vec::new();
 
     loop {
         future_urls = future_url_buffer.clone();
@@ -362,7 +363,11 @@ fn main() {
 
                     if _found_urls != None {
                         let mut found_urls = _found_urls.unwrap();
-                        future_url_buffer.append(&mut found_urls.0);
+                        future_url_buffer.append(&mut found_urls.0.clone());
+
+                        if found_urls.1 {
+                            all_found_urls.append(&mut found_urls.0.clone());
+                        }
                     }
                 }
             } else {
