@@ -13,13 +13,13 @@ use reqwest::Client;
 use robotparser::RobotFileParser;
 use url::Url;
 
-fn get_attribute_for_elem(elem: &str) -> String {
+fn get_attribute_for_elem<'a>(elem: &str) -> Option<&'a str> {
     match elem {
-        "a" => String::from("href"),
-        "script" => String::from("src"),
-        "link" => String::from("href"),
-        "img" => String::from("src"),
-        _ => String::from("NO_OPERATION"),
+        "a" => Some("href"),
+        "script" => Some("src"),
+        "link" => Some("href"),
+        "img" => Some("src"),
+        _ => None,
     }
 }
 
@@ -85,11 +85,12 @@ fn find_urls_in_html(
 
     for (_pos, tag) in html {
         if tag.state == htmlstream::HTMLTagState::Opening && tag.attributes != "" {
-            let attribute_name = get_attribute_for_elem(&tag.name);
+            let _attribute_name = get_attribute_for_elem(&tag.name);
 
-            if attribute_name == "NO_OPERATION" {
+            if _attribute_name == None {
                 continue;
             }
+            let attribute_name = _attribute_name.unwrap();
 
             for attribute_set in tag.attributes.split(" ") {
                 if attribute_set.contains("=") {
