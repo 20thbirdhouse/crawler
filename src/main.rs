@@ -51,12 +51,21 @@ fn get_root_domain(url: &str) -> Option<String> {
         );
         return None;
     } else if hostname.unwrap().contains('.') {
-        let mut ret = String::from(parsed_url.scheme());
-        ret.push_str("://");
-        ret.push_str(hostname.unwrap());
-        ret.push('/');
-        debug!("found {} to be main domain!", ret);
-        return Some(String::from(ret));
+        let mut returned_url = parsed_url.clone();
+        let set_host_result = returned_url.set_host(Some(hostname.unwrap()));
+        if set_host_result.is_err() {
+            warn!(
+                "error setting host of {} to {}: {:?}",
+                returned_url.as_str(),
+                hostname.unwrap(),
+                set_host_result
+            );
+            return None;
+        }
+        returned_url.set_path("/");
+
+        debug!("found {} to be main domain!", returned_url.as_str());
+        return Some(returned_url.as_str().to_string());
     } else {
         debug!("{} is main domain, ignore", hostname.unwrap());
         return None;
