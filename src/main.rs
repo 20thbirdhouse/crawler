@@ -135,7 +135,7 @@ fn repair_suggested_url(
         return None;
     }
 
-    let _parsed_found_url = Url::parse(&found_url);
+    let mut _parsed_found_url = Url::parse(&found_url);
     let mut parsed_found_url: Url;
 
     if !_parsed_found_url.is_err() {
@@ -155,8 +155,9 @@ fn repair_suggested_url(
             return None;
         }
     } else {
-        warn!("strange url found: {}", found_url);
-        return None;
+        let mut modified_url = "./".to_string();
+        modified_url.push_str(&found_url);
+        parsed_found_url = original_url.join(&modified_url).unwrap();
     }
 
     let mut _returned_vec = vec![parsed_found_url.as_str().to_string()];
