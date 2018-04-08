@@ -107,20 +107,16 @@ fn find_urls_in_html(
             }
             let attribute_name = _attribute_name.unwrap();
 
-            for attribute_set in tag.attributes.split(" ") {
-                if attribute_set.contains("=") {
-                    let mut attribute_splitted = attribute_set.split("=\"");
-
-                    if attribute_splitted.nth(0).unwrap() == attribute_name {
-                        let mut attribute_splitted_collection: Vec<&str> =
-                            attribute_splitted.collect();
-                        add_urls_to_vec(
-                            repair_suggested_url(original_url, attribute_splitted_collection),
-                            &mut returned_vec,
-                            fetched_cache,
-                        );
-                    }
+            for (_pos, attribute) in htmlstream::attr_iter(&tag.attributes) {
+                if attribute.name != attribute_name {
+                    continue;
                 }
+
+                add_urls_to_vec(
+                    repair_suggested_url(original_url, attribute),
+                    &mut returned_vec,
+                    fetched_cache,
+                );
             }
         }
     }
@@ -128,45 +124,31 @@ fn find_urls_in_html(
     return returned_vec;
 }
 
-fn repair_suggested_url(original_url: &Url, attribute_splitted: Vec<&str>) -> Option<Vec<String>> {
+fn repair_suggested_url(
+    original_url: &Url,
+    attribute: htmlstream::HTMLTagAttribute,
+) -> Option<Vec<String>> {
     let mut returned_vec: Vec<String> = Vec::new();
-    let mut found_url = attribute_splitted[0]
-        .replace("\n", "")
-        .split("#")
-        .nth(0)
-        .unwrap()
-        .to_string();
+    let found_url = attribute.value.split("#").nth(0).unwrap().to_string();
 
-    // Some urls contain an =, particularly in GET parameters.
-    // This accounts for them.
-    let mut current = 0;
-    for found_url_part in attribute_splitted {
-        current += 1;
-
-        if current > 1 {
-            // Ensure current > 1 so we don't get duplicates in the path
-            found_url.push_str(found_url_part);
-        }
-    }
-
-    if found_url.len() == 0 || found_url.len() == 1 {
+    // NOTE Is this *really* necessary?
+    if found_url.len() == 0 {
         return None;
     }
 
-    // Remove the final quote.
-    found_url.pop();
+    let _parsed_found_url = Url::parse(&found_url);
+    let mut parsed_found_url: Url;
 
-    let mut parsed_found_url;
-
-    if found_url.starts_with(".") || found_url.starts_with("?") {
+    if !_parsed_found_url.is_err() {
+        parsed_found_url = _parsed_found_url.unwrap();
+    } else if found_url.starts_with(".") || found_url.starts_with("?") {
         parsed_found_url = original_url.join(&found_url).unwrap();
     } else if found_url.starts_with("/") {
         if found_url.chars().nth(1).unwrap_or(' ') != '/' {
             parsed_found_url = original_url.clone();
             parsed_found_url.set_path("/");
         } else if found_url.starts_with("//") {
-            let mut modified_url = "".to_string();
-            modified_url.push_str("https:");
+            let mut modified_url = "https:".to_string();
             modified_url.push_str(&found_url);
             parsed_found_url = Url::parse(&modified_url).unwrap();
         } else {
@@ -174,13 +156,8 @@ fn repair_suggested_url(original_url: &Url, attribute_splitted: Vec<&str>) -> Op
             return None;
         }
     } else {
-        let _parsed_found_url = Url::parse(&found_url);
-
-        if _parsed_found_url.is_err() {
-            warn!("strange url found: {}", found_url);
-            return None;
-        }
-        parsed_found_url = _parsed_found_url.unwrap();
+        warn!("strange url found: {}", found_url);
+        return None;
     }
 
     returned_vec.push(parsed_found_url.as_str().to_string());
@@ -228,27 +205,12 @@ fn crawl_page(
                 || tag.state == htmlstream::HTMLTagState::SelfClosing)
                 && tag.name == "meta" && ROBOTS_REGEX.is_match(&tag.attributes)
             {
-                for attribute_set in tag.attributes.split(" ") {
-                    let mut attribute_split = attribute_set.split("=\"");
-                    let mut _robotsvalue = attribute_split.nth(1);
-                    if attribute_split.clone().count() == 1 || _robotsvalue.unwrap_or("").len() == 0
-                        || _robotsvalue == None
-                    {
-                        debug!(
-                            "Odd <meta> tag on {}: {} (attribute_set={:?})",
-                            url, tag.html, attribute_set
-                        );
-                        continue;
-                    } else if !attribute_set.starts_with("content") {
+                for (_pos, attribute) in htmlstream::attr_iter(&tag.attributes) {
+                    if attribute.name != "content" {
                         continue;
                     }
-                    let mut robotsvalue = _robotsvalue.unwrap().to_string();
 
-                    if robotsvalue.ends_with("\"") || robotsvalue.ends_with("\"") {
-                        robotsvalue.pop();
-                    }
-
-                    for robots_command in robotsvalue.split(",").map(|x| x.to_lowercase()) {
+                    for robots_command in attribute.value.split(",").map(|x| x.to_lowercase()) {
                         if robots_command == "nofollow" {
                             return None;
                         } else if robots_command == "noindex" {
