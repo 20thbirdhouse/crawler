@@ -128,7 +128,6 @@ fn repair_suggested_url(
     original_url: &Url,
     attribute: htmlstream::HTMLTagAttribute,
 ) -> Option<Vec<String>> {
-    let mut returned_vec: Vec<String> = Vec::new();
     let found_url = attribute.value.split("#").nth(0).unwrap().to_string();
 
     // NOTE Is this *really* necessary?
@@ -160,14 +159,89 @@ fn repair_suggested_url(
         return None;
     }
 
-    returned_vec.push(parsed_found_url.as_str().to_string());
+    let mut _returned_vec = vec![parsed_found_url.as_str().to_string()];
 
     let main_domain = get_root_domain(parsed_found_url.as_str());
     if main_domain != None {
-        returned_vec.push(main_domain.unwrap());
+        _returned_vec.push(main_domain.unwrap());
     }
 
+    let returned_vec: Vec<String> = _returned_vec
+        .iter()
+        .map(|x| {
+            remove_get_params(Url::parse(x).unwrap())
+                .as_str()
+                .to_string()
+        })
+        .collect();
+
     return Some(returned_vec);
+}
+
+fn remove_get_params(mut url: Url) -> Url {
+    lazy_static! {
+        // TODO remove all these to_strings
+        static ref BLOCKED_GET_PARAMS: Vec<String> = vec![
+            "utm_source".to_string(),
+            "utm_medium".to_string(),
+            "utm_term".to_string(),
+            "utm_content".to_string(),
+            "utm_campaign".to_string(),
+            "utm_reader".to_string(),
+            "utm_place".to_string(),
+            "utm_userid".to_string(),
+            "utm_cid".to_string(),
+            "utm_name".to_string(),
+            "utm_pubreferrer".to_string(),
+            "utm_swu".to_string(),
+            "utm_viz_id".to_string(),
+            "ga_source".to_string(),
+            "ga_medium".to_string(),
+            "ga_term".to_string(),
+            "ga_content".to_string(),
+            "ga_campaign".to_string(),
+            "ga_place".to_string(),
+            "yclid".to_string(),
+            "_openstat".to_string(),
+            "fb_action_ids".to_string(),
+            "fb_action_types".to_string(),
+            "fb_ref".to_string(),
+            "fb_source".to_string(),
+            "action_object_map".to_string(),
+            "action_type_map".to_string(),
+            "action_ref_map".to_string(),
+            "_hsenc".to_string(),
+            "mkt_tok".to_string(),
+            "hmb_campaign".to_string(),
+            "hmb_medium".to_string(),
+            "hmb_source".to_string(),
+            "lang".to_string()
+        ];
+    }
+
+    let mut result = "".to_string();
+
+    for param in url.query().unwrap_or("").replace("&amp;", "&").split("&") {
+        let mut ok = true;
+
+        for blocked_param in BLOCKED_GET_PARAMS.iter() {
+            if param.starts_with(blocked_param) {
+                ok = false;
+            }
+        }
+
+        if ok {
+            result.push_str(&param);
+            result.push_str("&");
+        }
+    }
+
+    if result.ends_with("&") {
+        result.pop();
+    }
+
+    url.set_query(if result == "" { None } else { Some(&result) });
+    return url;
 }
 
 fn crawl_page(
