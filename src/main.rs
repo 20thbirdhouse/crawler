@@ -19,6 +19,12 @@ fn get_attribute_for_elem<'a>(elem: &str) -> Option<&'a str> {
         "script" => Some("src"),
         "link" => Some("href"),
         "img" => Some("src"),
+        "iframe" => Some("src"),
+        "amp-img" => Some("src"),
+        "amp-anim" => Some("src"),
+        "amp-video" => Some("src"),
+        "amp-audio" => Some("src"),
+        "amp-iframe" => Some("src"),
         _ => None,
     }
 }
