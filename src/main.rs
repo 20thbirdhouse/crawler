@@ -9,25 +9,8 @@ extern crate url;
 use reqwest::Client;
 use robotparser::RobotFileParser;
 use url::Url;
-use html5ever::tokenizer::{BufferQueue, ParseError, StartTag, TagToken, Token, TokenSink,
-                           TokenSinkResult, Tokenizer};
-use html5ever::tendril::{ByteTendril, Tendril};
 
-fn get_attribute_for_elem<'a>(elem: &str) -> Option<&'a str> {
-    match elem {
-        "a" => Some("href"),
-        "script" => Some("src"),
-        "link" => Some("href"),
-        "img" => Some("src"),
-        "iframe" => Some("src"),
-        "amp-img" => Some("src"),
-        "amp-anim" => Some("src"),
-        "amp-video" => Some("src"),
-        "amp-audio" => Some("src"),
-        "amp-iframe" => Some("src"),
-        _ => None,
-    }
-}
+mod html;
 
 fn get_root_domain(url: &str) -> Option<String> {
     debug!("getting root domain for {}", url);
@@ -89,138 +72,6 @@ fn add_urls_to_vec(urls: Option<Vec<String>>, into: &mut Vec<String>, cache: &Ve
             }
         }
     }
-}
-
-// HACK we need a pointer to `false'
-static FALSE: bool = false;
-fn find_urls_in_html(
-    original_url: Url,
-    raw_html: String,
-    fetched_cache: Vec<String>,
-) -> (bool, Vec<String>) {
-    struct Sink<'a> {
-        original_url: Url,
-        returned_vec: &'a mut Vec<String>,
-        fetched_cache: Vec<String>,
-        index_url: &'a bool,
-        nofollow: bool,
-    }
-
-    impl<'a> TokenSink for Sink<'a> {
-        type Handle = ();
-
-        fn process_token(&mut self, token: Token, _line_number: u64) -> TokenSinkResult<()> {
-            if self.nofollow {
-                return TokenSinkResult::Continue;
-            }
-
-            trace!("token {:?}", token);
-            match token {
-                TagToken(tag) => {
-                    // HACK use .trim() to convert to a &str
-                    if tag.name.trim() == "meta" && (tag.kind == StartTag || tag.self_closing) {
-                        let mut ok = false;
-                        for attribute in tag.attrs.clone() {
-                            if attribute.name.local.trim() == "name"
-                                && (attribute.value == Tendril::from_slice("robots")
-                                    || attribute.value == Tendril::from_slice("twentiethbot"))
-                            {
-                                ok = true;
-                            }
-                        }
-
-                        if !ok {
-                            return TokenSinkResult::Continue;
-                        }
-
-                        for attribute in tag.attrs {
-                            if attribute.name.local.trim() != "content" {
-                                continue;
-                            }
-
-                            for robots_command in
-                                attribute.value.split(",").map(|x| x.to_lowercase())
-                            {
-                                debug!("found robot-command {}", robots_command);
-                                match robots_command.as_str() {
-                                    "nofollow" => {
-                                        self.nofollow = true;
-                                        return TokenSinkResult::Continue;
-                                    }
-                                    "noindex" => {
-                                        self.index_url = &FALSE;
-                                    }
-                                    _ => {
-                                        // Currently, other properties like noodp and noarchive are
-                                        // irrelevant. We'll probably deal with them later.
-                                    }
-                                }
-                            }
-                        }
-                    } else if tag.kind == StartTag && tag.attrs.len() != 0 {
-                        let _attribute_name = get_attribute_for_elem(&tag.name);
-
-                        if _attribute_name == None {
-                            return TokenSinkResult::Continue;
-                        }
-                        let attribute_name = _attribute_name.unwrap();
-
-                        for attribute in &tag.attrs {
-                            if &attribute.name.local != attribute_name {
-                                continue;
-                            }
-
-                            trace!("element {:?} found", tag);
-                            add_urls_to_vec(
-                                repair_suggested_url(
-                                    &self.original_url,
-                                    (&attribute.name.local, &attribute.value),
-                                ),
-                                &mut self.returned_vec,
-                                &self.fetched_cache,
-                            );
-                        }
-                    }
-                }
-                ParseError(error) => {
-                    warn!("error parsing html for {}: {:?}", self.original_url, error);
-                }
-                _ => {}
-            }
-            return TokenSinkResult::Continue;
-        }
-    }
-
-    let mut result = Vec::new();
-    let index = true;
-    {
-        let html = Sink {
-            original_url: original_url,
-            returned_vec: &mut result,
-            fetched_cache: fetched_cache,
-            index_url: &index,
-            nofollow: false,
-        };
-
-        let mut byte_tendril = ByteTendril::new();
-        {
-            let tendril_push_result = byte_tendril.try_push_bytes(&raw_html.into_bytes());
-
-            if tendril_push_result.is_err() {
-                warn!("error pushing bytes to tendril: {:?}", tendril_push_result);
-                return (false, Vec::new());
-            }
-        }
-
-        let mut queue = BufferQueue::new();
-        queue.push_back(byte_tendril.try_reinterpret().unwrap());
-        let mut tok = Tokenizer::new(html, std::default::Default::default()); // default default! default?
-        let _feed = tok.feed(&mut queue);
-
-        assert!(queue.is_empty());
-        tok.end();
-    }
-    return (index, result);
 }
 
 fn repair_suggested_url(original_url: &Url, attribute: (&str, &str)) -> Option<Vec<String>> {
@@ -359,7 +210,7 @@ fn crawl_page(
     let text = _text.unwrap();
 
     if content_type == reqwest::mime::HTML {
-        return Some(find_urls_in_html(Url::parse(url).unwrap(), text, cache));
+        return Some(html::find_urls_in_html(Url::parse(url).unwrap(), text, cache).unwrap_or((false, Vec::new())));
     }
 
     return None;
