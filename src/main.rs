@@ -363,6 +363,10 @@ fn main() {
         future_urls = future_url_buffer.clone();
         future_url_buffer = Vec::new();
 
+        if future_urls.len() == 0 {
+            panic!("no more urls???");
+        }
+
         for url in future_urls {
             debug!("url = {}", url);
             let parsed_url = Url::parse(&url).unwrap();
