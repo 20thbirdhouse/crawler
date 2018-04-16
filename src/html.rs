@@ -20,7 +20,7 @@ fn get_attribute_for_elem<'a>(elem: &str) -> Option<&'a str> {
     }
 }
 
-struct HtmlTokenSink<'a> (&'a mut Vec<Token>);
+struct HtmlTokenSink<'a>(&'a mut Vec<Token>);
 
 impl<'a> TokenSink for HtmlTokenSink<'a> {
     type Handle = ();
@@ -34,9 +34,8 @@ impl<'a> TokenSink for HtmlTokenSink<'a> {
 pub fn find_urls_in_html(
     original_url: Url,
     raw_html: String,
-    fetched_cache: Vec<String>
+    fetched_cache: Vec<String>,
 ) -> Option<(bool, Vec<String>)> {
-
     let mut result = Vec::new();
     let mut index_url = true;
     let mut found_urls = Vec::new();
@@ -72,7 +71,10 @@ pub fn find_urls_in_html(
                     let mut ok = false;
 
                     for attribute in tag.attrs.clone() {
-                        if &attribute.name.local == "name"  && (attribute.value == Tendril::from_slice("robots") || attribute.value == Tendril::from_slice("twentiethbot")) {
+                        if &attribute.name.local == "name"
+                            && (attribute.value == Tendril::from_slice("robots")
+                                || attribute.value == Tendril::from_slice("twentiethbot"))
+                        {
                             ok = true;
                         }
                     }
@@ -116,7 +118,7 @@ pub fn find_urls_in_html(
                         add_urls_to_vec(
                             repair_suggested_url(
                                 &original_url,
-                                (&attribute.name.local, &attribute.value)
+                                (&attribute.name.local, &attribute.value),
                             ),
                             &mut found_urls,
                             &fetched_cache,

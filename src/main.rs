@@ -34,7 +34,10 @@ fn crawl_page(
     let text = _text.unwrap();
 
     if content_type == reqwest::mime::HTML {
-        return Some(html::find_urls_in_html(Url::parse(url).unwrap(), text, cache).unwrap_or((false, Vec::new())));
+        return Some(
+            html::find_urls_in_html(Url::parse(url).unwrap(), text, cache)
+                .unwrap_or((false, Vec::new())),
+        );
     }
 
     return None;

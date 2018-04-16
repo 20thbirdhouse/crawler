@@ -216,6 +216,9 @@ mod tests {
 
     #[test]
     fn _get_root_domain() {
-        assert_eq!(get_root_domain("https://test.test.domain/").unwrap(), "https://test.domain/");
+        assert_eq!(
+            get_root_domain("https://test.test.domain/").unwrap(),
+            "https://test.domain/"
+        );
     }
 }
