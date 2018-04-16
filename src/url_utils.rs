@@ -191,3 +191,31 @@ pub fn check_if_is_in_url_list(object: &str, array: &Vec<String>) -> bool {
     return true;
 }
 
+// =====================================================================[Tests]
+#[cfg(test)]
+mod tests {
+    use url_utils::*;
+
+    #[test]
+    fn _remove_get_params() {
+        for param in BLOCKED_GET_PARAMS.to_vec() {
+            let url = Url::parse(&format!("https://test.domain/test?{}=1", param)).unwrap();
+            assert_eq!("https://test.domain/test", remove_get_params(url).as_str());
+        }
+    }
+
+    #[test]
+    fn _check_if_is_in_url_list() {
+        let mut fake_vec: Vec<String> = vec!["0".to_string()];
+
+        for i in 1..100 {
+            assert!(!check_if_is_in_url_list(&(i - 1).to_string(), &fake_vec));
+            fake_vec.push(i.to_string());
+        }
+    }
+
+    #[test]
+    fn _get_root_domain() {
+        assert_eq!(get_root_domain("https://test.test.domain/").unwrap(), "https://test.domain/");
+    }
+}
