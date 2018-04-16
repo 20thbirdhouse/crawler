@@ -1,8 +1,6 @@
 extern crate env_logger;
 extern crate html5ever;
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate log;
 extern crate reqwest;
 extern crate robotparser;
@@ -277,47 +275,44 @@ fn repair_suggested_url(original_url: &Url, attribute: (&str, &str)) -> Option<V
     return Some(returned_vec);
 }
 
-fn remove_get_params(mut url: Url) -> Url {
-    lazy_static! {
-        // TODO remove all these to_strings
-        static ref BLOCKED_GET_PARAMS: Vec<String> = vec![
-            "utm_source".to_string(),
-            "utm_medium".to_string(),
-            "utm_term".to_string(),
-            "utm_content".to_string(),
-            "utm_campaign".to_string(),
-            "utm_reader".to_string(),
-            "utm_place".to_string(),
-            "utm_userid".to_string(),
-            "utm_cid".to_string(),
-            "utm_name".to_string(),
-            "utm_pubreferrer".to_string(),
-            "utm_swu".to_string(),
-            "utm_viz_id".to_string(),
-            "ga_source".to_string(),
-            "ga_medium".to_string(),
-            "ga_term".to_string(),
-            "ga_content".to_string(),
-            "ga_campaign".to_string(),
-            "ga_place".to_string(),
-            "yclid".to_string(),
-            "_openstat".to_string(),
-            "fb_action_ids".to_string(),
-            "fb_action_types".to_string(),
-            "fb_ref".to_string(),
-            "fb_source".to_string(),
-            "action_object_map".to_string(),
-            "action_type_map".to_string(),
-            "action_ref_map".to_string(),
-            "_hsenc".to_string(),
-            "mkt_tok".to_string(),
-            "hmb_campaign".to_string(),
-            "hmb_medium".to_string(),
-            "hmb_source".to_string(),
-            "lang".to_string()
-        ];
-    }
+static BLOCKED_GET_PARAMS: [&str; 34] = [
+    "utm_source",
+    "utm_medium",
+    "utm_term",
+    "utm_content",
+    "utm_campaign",
+    "utm_reader",
+    "utm_place",
+    "utm_userid",
+    "utm_cid",
+    "utm_name",
+    "utm_pubreferrer",
+    "utm_swu",
+    "utm_viz_id",
+    "ga_source",
+    "ga_medium",
+    "ga_term",
+    "ga_content",
+    "ga_campaign",
+    "ga_place",
+    "yclid",
+    "_openstat",
+    "fb_action_ids",
+    "fb_action_types",
+    "fb_ref",
+    "fb_source",
+    "action_object_map",
+    "action_type_map",
+    "action_ref_map",
+    "_hsenc",
+    "mkt_tok",
+    "hmb_campaign",
+    "hmb_medium",
+    "hmb_source",
+    "lang",
+];
 
+fn remove_get_params(mut url: Url) -> Url {
     let mut result = "".to_string();
 
     for param in url.query().unwrap_or("").replace("&amp;", "&").split("&") {
