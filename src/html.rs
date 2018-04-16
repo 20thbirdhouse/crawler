@@ -1,6 +1,7 @@
 use url::Url;
 use html5ever::tokenizer::*;
 use html5ever::tendril::{ByteTendril, Tendril};
+use url_utils::*;
 use std;
 
 fn get_attribute_for_elem<'a>(elem: &str) -> Option<&'a str> {
