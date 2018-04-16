@@ -58,11 +58,9 @@ fn find_in_robot_cache<'a>(
 }
 
 fn main() {
-    if std::env::args().count() != 2 {
-        println!("crawler: Crawls the Web for URLs using a RegEx.");
-        println!("         Usage: crawler <url>");
-        return;
-    }
+    // subtract 1 to account for argv[0]
+    assert_eq!(std::env::args().count() - 1, 2, "not enough arguments");
+
     env_logger::init();
     info!("crawler init!");
 
@@ -88,7 +86,7 @@ fn main() {
             let mut hostname = String::from(parsed_url.host_str().unwrap()); // TODO Merge with previous line
 
             if !url_utils::check_if_is_in_url_list(&url, &fetched_cache) {
-                info!("==> Skipping {} (already fetched)", url);
+                info!("[skipping {} (already fetched)]", url);
                 continue;
             } else {
                 fetched_cache.push(url.clone());
@@ -99,11 +97,8 @@ fn main() {
             let mut _robotsok = find_in_robot_cache(&hostname, robots_cache.clone());
             let mut robotsok: (String, RobotFileParser);
 
-            let mut _hostname = String::from(parsed_url.scheme());
-            _hostname.push_str("://");
-            _hostname.push_str(&hostname);
-            _hostname.push_str("/robots.txt");
-            hostname = _hostname;
+            let mut robotstxt_path = parsed_url.clone();
+            robotstxt_path.set_path("/robots.txt");
 
             if _robotsok == None {
                 if robots_cache.len() > 512 {
@@ -121,7 +116,7 @@ fn main() {
                 robotsok = _robotsok.unwrap();
             }
 
-            if robotsok.1.can_fetch("twentiethcrawler", &url) {
+            if robotsok.1.can_fetch("twentiethbot", &url) {
                 info!("fetching {}!", url);
                 let response = client.get(&url).send();
 
