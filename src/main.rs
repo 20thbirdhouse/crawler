@@ -1,10 +1,9 @@
 extern crate env_logger;
-extern crate htmlstream;
+extern crate html5ever;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-extern crate regex;
 extern crate reqwest;
 extern crate robotparser;
 extern crate url;
@@ -12,6 +11,9 @@ extern crate url;
 use reqwest::Client;
 use robotparser::RobotFileParser;
 use url::Url;
+use html5ever::tokenizer::{BufferQueue, ParseError, StartTag, TagToken, Token, TokenSink,
+                           TokenSinkResult, Tokenizer};
+use html5ever::tendril::{ByteTendril, Tendril};
 
 fn get_attribute_for_elem<'a>(elem: &str) -> Option<&'a str> {
     match elem {
@@ -91,44 +93,140 @@ fn add_urls_to_vec(urls: Option<Vec<String>>, into: &mut Vec<String>, cache: &Ve
     }
 }
 
+// HACK we need a pointer to `false'
+static FALSE: bool = false;
 fn find_urls_in_html(
-    original_url: &Url,
-    html: htmlstream::HTMLTagIterator,
-    fetched_cache: &Vec<String>,
-) -> Vec<String> {
-    let mut returned_vec = Vec::new();
+    original_url: Url,
+    raw_html: String,
+    fetched_cache: Vec<String>,
+) -> (bool, Vec<String>) {
+    struct Sink<'a> {
+        original_url: Url,
+        returned_vec: &'a mut Vec<String>,
+        fetched_cache: Vec<String>,
+        index_url: &'a bool,
+        nofollow: bool,
+    }
 
-    for (_pos, tag) in html {
-        if tag.state == htmlstream::HTMLTagState::Opening && tag.attributes != "" {
-            let _attribute_name = get_attribute_for_elem(&tag.name);
+    impl<'a> TokenSink for Sink<'a> {
+        type Handle = ();
 
-            if _attribute_name == None {
-                continue;
+        fn process_token(&mut self, token: Token, _line_number: u64) -> TokenSinkResult<()> {
+            if self.nofollow {
+                return TokenSinkResult::Continue;
             }
-            let attribute_name = _attribute_name.unwrap();
 
-            for (_pos, attribute) in htmlstream::attr_iter(&tag.attributes) {
-                if attribute.name != attribute_name {
-                    continue;
+            trace!("token {:?}", token);
+            match token {
+                TagToken(tag) => {
+                    // HACK use .trim() to convert to a &str
+                    if tag.name.trim() == "meta" && (tag.kind == StartTag || tag.self_closing) {
+                        let mut ok = false;
+                        for attribute in tag.attrs.clone() {
+                            if attribute.name.local.trim() == "name"
+                                && (attribute.value == Tendril::from_slice("robots")
+                                    || attribute.value == Tendril::from_slice("twentiethbot"))
+                            {
+                                ok = true;
+                            }
+                        }
+
+                        if !ok {
+                            return TokenSinkResult::Continue;
+                        }
+
+                        for attribute in tag.attrs {
+                            if attribute.name.local.trim() != "content" {
+                                continue;
+                            }
+
+                            for robots_command in
+                                attribute.value.split(",").map(|x| x.to_lowercase())
+                            {
+                                debug!("found robot-command {}", robots_command);
+                                match robots_command.as_str() {
+                                    "nofollow" => {
+                                        self.nofollow = true;
+                                        return TokenSinkResult::Continue;
+                                    }
+                                    "noindex" => {
+                                        self.index_url = &FALSE;
+                                    }
+                                    _ => {
+                                        // Currently, other properties like noodp and noarchive are
+                                        // irrelevant. We'll probably deal with them later.
+                                    }
+                                }
+                            }
+                        }
+                    } else if tag.kind == StartTag && tag.attrs.len() != 0 {
+                        let _attribute_name = get_attribute_for_elem(&tag.name);
+
+                        if _attribute_name == None {
+                            return TokenSinkResult::Continue;
+                        }
+                        let attribute_name = _attribute_name.unwrap();
+
+                        for attribute in &tag.attrs {
+                            if &attribute.name.local != attribute_name {
+                                continue;
+                            }
+
+                            trace!("element {:?} found", tag);
+                            add_urls_to_vec(
+                                repair_suggested_url(
+                                    &self.original_url,
+                                    (&attribute.name.local, &attribute.value),
+                                ),
+                                &mut self.returned_vec,
+                                &self.fetched_cache,
+                            );
+                        }
+                    }
                 }
-
-                add_urls_to_vec(
-                    repair_suggested_url(original_url, attribute),
-                    &mut returned_vec,
-                    fetched_cache,
-                );
+                ParseError(error) => {
+                    warn!("error parsing html for {}: {:?}", self.original_url, error);
+                }
+                _ => {}
             }
+            return TokenSinkResult::Continue;
         }
     }
 
-    return returned_vec;
+    let mut result = Vec::new();
+    let index = true;
+    {
+        let html = Sink {
+            original_url: original_url,
+            returned_vec: &mut result,
+            fetched_cache: fetched_cache,
+            index_url: &index,
+            nofollow: false,
+        };
+
+        let mut byte_tendril = ByteTendril::new();
+        {
+            let tendril_push_result = byte_tendril.try_push_bytes(&raw_html.into_bytes());
+
+            if tendril_push_result.is_err() {
+                warn!("error pushing bytes to tendril: {:?}", tendril_push_result);
+                return (false, Vec::new());
+            }
+        }
+
+        let mut queue = BufferQueue::new();
+        queue.push_back(byte_tendril.try_reinterpret().unwrap());
+        let mut tok = Tokenizer::new(html, std::default::Default::default()); // default default! default?
+        let _feed = tok.feed(&mut queue);
+
+        assert!(queue.is_empty());
+        tok.end();
+    }
+    return (index, result);
 }
 
-fn repair_suggested_url(
-    original_url: &Url,
-    attribute: htmlstream::HTMLTagAttribute,
-) -> Option<Vec<String>> {
-    let found_url = attribute.value.split("#").nth(0).unwrap().to_string();
+fn repair_suggested_url(original_url: &Url, attribute: (&str, &str)) -> Option<Vec<String>> {
+    let found_url = attribute.1.split("#").nth(0).unwrap().to_string();
 
     // NOTE Is this *really* necessary?
     if found_url.len() == 0 {
@@ -249,8 +347,8 @@ fn crawl_page(
     url: &str,
     headers: &reqwest::header::Headers,
     _text: Result<String, reqwest::Error>,
-    cache: &Vec<String>,
-) -> Option<(Vec<String>, bool)> {
+    cache: Vec<String>,
+) -> Option<(bool, Vec<String>)> {
     let _content_type = headers.get::<reqwest::header::ContentType>();
 
     if _content_type == None {
@@ -266,46 +364,7 @@ fn crawl_page(
     let text = _text.unwrap();
 
     if content_type == reqwest::mime::HTML {
-        trace!("Started parsing html...");
-        let html = htmlstream::tag_iter(text.as_str());
-        trace!("Finished!");
-        let mut index_url = true;
-
-        lazy_static! {
-            static ref ROBOTS_REGEX: regex::Regex = regex::Regex::new(".*name=.(robots|twentiethbot)..*").unwrap();
-        }
-
-        for (_pos, tag) in html {
-            if (tag.state == htmlstream::HTMLTagState::Opening
-                || tag.state == htmlstream::HTMLTagState::SelfClosing)
-                && tag.name == "meta" && ROBOTS_REGEX.is_match(&tag.attributes)
-            {
-                for (_pos, attribute) in htmlstream::attr_iter(&tag.attributes) {
-                    if attribute.name != "content" {
-                        continue;
-                    }
-
-                    for robots_command in attribute.value.split(",").map(|x| x.to_lowercase()) {
-                        if robots_command == "nofollow" {
-                            return None;
-                        } else if robots_command == "noindex" {
-                            index_url = false;
-                        }
-                        // Other values, like noodp and noarchive/nocache, are currently
-                        // irrelevant.
-                    }
-                }
-            }
-        }
-
-        return Some((
-            find_urls_in_html(
-                &Url::parse(url).unwrap(),
-                htmlstream::tag_iter(text.as_str()),
-                cache,
-            ),
-            index_url,
-        ));
+        return Some(find_urls_in_html(Url::parse(url).unwrap(), text, cache));
     }
 
     return None;
@@ -416,14 +475,14 @@ fn main() {
                     let mut response = response.unwrap();
                     let text = response.text();
                     let mut _found_urls =
-                        crawl_page(&url, &response.headers(), text, &fetched_cache);
+                        crawl_page(&url, &response.headers(), text, fetched_cache.clone());
 
                     if _found_urls != None {
                         let mut found_urls = _found_urls.unwrap();
-                        future_url_buffer.append(&mut found_urls.0.clone());
+                        future_url_buffer.append(&mut found_urls.1);
 
-                        if found_urls.1 {
-                            all_found_urls.append(&mut found_urls.0.clone());
+                        if found_urls.0 {
+                            all_found_urls.append(&mut found_urls.1.clone());
                         }
                     }
                 }
