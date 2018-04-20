@@ -220,5 +220,75 @@ mod tests {
             get_root_domain("https://test.test.domain/").unwrap(),
             "https://test.domain/"
         );
+        assert_eq!(
+            get_root_domain("https://test.test.test.domain/").unwrap(),
+            "https://test.domain/"
+        );
+    }
+
+    #[test]
+    fn _add_url_to_vec() {
+        let mut fake_vec: Vec<String> = Vec::new();
+
+        add_urls_to_vec(
+            Some(vec!["https://google.com".to_string()]),
+            &mut fake_vec,
+            &Vec::new(),
+        );
+        assert_eq!(fake_vec.len(), 1);
+        add_urls_to_vec(
+            Some(vec!["https://google.com".to_string()]),
+            &mut fake_vec,
+            &Vec::new(),
+        );
+        assert_eq!(fake_vec.len(), 1);
+        add_urls_to_vec(
+            Some(vec!["https://google.gl".to_string()]),
+            &mut fake_vec,
+            &Vec::new(),
+        );
+        assert_eq!(fake_vec.len(), 2);
+
+        let fake_cache: Vec<String> = vec!["https://google.pl".to_string()];
+        add_urls_to_vec(
+            Some(vec!["https://google.pl".to_string()]),
+            &mut fake_vec,
+            &fake_cache,
+        );
+        assert_eq!(fake_vec.len(), 2);
+    }
+
+    #[test]
+    fn _repair_suggested_url() {
+        fn url(input: &str) -> Url {
+            Url::parse(input).unwrap()
+        }
+
+        assert_eq!(
+            repair_suggested_url(&url("https://google.com"), ("href", "main")),
+            Some(vec!["https://google.com/main".to_string()])
+        );
+        assert_eq!(
+            repair_suggested_url(&url("https://google.com/test"), ("href", "/main")),
+            Some(vec!["https://google.com/main".to_string()])
+        );
+        assert_eq!(
+            repair_suggested_url(&url("https://google.com"), ("href", "./main")),
+            Some(vec!["https://google.com/main".to_string()])
+        );
+        assert_eq!(
+            repair_suggested_url(&url("https://google.com"), ("href", "//bing.com")),
+            Some(vec!["https://bing.com".to_string()])
+        );
+        assert_eq!(
+            repair_suggested_url(
+                &url("https://google.com"),
+                ("href", "https://its.goggle.com")
+            ),
+            Some(vec![
+                "https://its.goggle.com".to_string(),
+                "https://goggle.com".to_string(),
+            ])
+        );
     }
 }
