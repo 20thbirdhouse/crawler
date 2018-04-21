@@ -35,10 +35,11 @@ pub fn find_urls_in_html(
     original_url: Url,
     raw_html: String,
     fetched_cache: Vec<String>,
-) -> Option<(bool, Vec<String>)> {
+) -> Option<(bool, Vec<String>, String, Vec<(String, String)>)> {
     let mut result = Vec::new();
     let mut index_url = true;
     let mut found_urls = Vec::new();
+    let mut meta: Vec<(String, String)> = Vec::new();
 
     {
         let html = HtmlTokenSink(&mut result);
@@ -71,6 +72,7 @@ pub fn find_urls_in_html(
                     let mut ok = false;
 
                     for attribute in tag.attrs.clone() {
+                        meta.push(((&attribute.name.local).to_string(), (&attribute.value).to_string()));
                         if &attribute.name.local == "name"
                             && (attribute.value == Tendril::from_slice("robots")
                                 || attribute.value == Tendril::from_slice("twentiethbot"))
@@ -133,5 +135,5 @@ pub fn find_urls_in_html(
         }
     }
 
-    return Some((index_url, found_urls));
+    return Some((index_url, found_urls, "html".to_string(), meta));
 }

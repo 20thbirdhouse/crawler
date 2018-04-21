@@ -6,7 +6,8 @@ with Servo's [html5ever](https://github.com/servo/html5ever).
 
 ## Usage
 Run with cargo. It's recommended to provide `RUST_LOG=crawler=info` to get its
-status as it crawls. Provide a URL to start with as well.
+status as it crawls. Provide a URL to start with as well. You will also want to
+pipe stdout to a file.
 ```sh
-RUST_LOG=crawler=info cargo run https://github.com
+RUST_LOG=crawler=info cargo run https://github.com >urls
 ```

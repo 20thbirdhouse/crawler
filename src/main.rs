@@ -5,6 +5,7 @@ extern crate log;
 extern crate reqwest;
 extern crate robotparser;
 extern crate url;
+extern crate ammonia;
 
 use reqwest::Client;
 use robotparser::RobotFileParser;
@@ -16,9 +17,9 @@ mod url_utils;
 fn crawl_page(
     url: &str,
     headers: &reqwest::header::Headers,
-    _text: Result<String, reqwest::Error>,
+    text: String,
     cache: Vec<String>,
-) -> Option<(bool, Vec<String>)> {
+) -> Option<(bool, Vec<String>, String, Vec<(String, String)>)> {
     let _content_type = headers.get::<reqwest::header::ContentType>();
 
     if _content_type == None {
@@ -27,16 +28,10 @@ fn crawl_page(
     }
     let content_type = _content_type.unwrap().subtype();
 
-    if _text.is_err() {
-        warn!("error getting text for {} ({:?})", url, _text);
-        return None;
-    }
-    let text = _text.unwrap();
-
     if content_type == reqwest::mime::HTML {
         return Some(
             html::find_urls_in_html(Url::parse(url).unwrap(), text, cache)
-                .unwrap_or((false, Vec::new())),
+                .unwrap_or((false, Vec::new(), "".to_string(), Vec::new())),
         );
     }
 
@@ -109,8 +104,8 @@ fn main() {
                     robots_cache.clear();
                 }
 
-                debug!("fetching robots.txt, aka {}", hostname);
-                let robotstxt = RobotFileParser::new(&hostname);
+                debug!("fetching robots.txt, aka {}", robotstxt_path);
+                let robotstxt = RobotFileParser::new(&robotstxt_path);
                 robotstxt.read();
                 robotsok = (String::from(original_hostname), robotstxt);
                 robots_cache.push(robotsok.clone());
@@ -127,16 +122,20 @@ fn main() {
                     warn!("request to {} failed: {:?}", url, response);
                 } else {
                     let mut response = response.unwrap();
-                    let text = response.text();
+                    let text = response.text().unwrap_or("???".to_string());
                     let mut _found_urls =
-                        crawl_page(&url, &response.headers(), text, fetched_cache.clone());
+                        crawl_page(&url, &response.headers(), text.clone(), fetched_cache.clone());
 
                     if _found_urls != None {
                         let mut found_urls = _found_urls.unwrap();
                         future_url_buffer.append(&mut found_urls.1);
 
-                        if found_urls.0 {
-                            all_found_urls.append(&mut found_urls.1.clone());
+                        if found_urls.0 && response.status() == reqwest::StatusCode::Ok {
+                            if found_urls.2 == "html" {
+                                let meta = found_urls.3.iter().map(|x| format!("{}={}", x.0, x.1)).collect::<Vec<String>>().join(";");
+                                println!("{}\t{}\t{}", url, ammonia::Builder::default().clean_content_tags(vec!["head", "style", "script"].into_iter().collect()).tags(std::collections::HashSet::new()).clean(&text).to_string().replace("\t", " ").replace("\n", " "), meta);
+                                all_found_urls.append(&mut found_urls.1.clone());
+                            }
                         }
                     }
                 }
