@@ -18,7 +18,7 @@ pub fn repair_suggested_url(original_url: &Url, attribute: (&str, &str)) -> Opti
     } else if found_url.starts_with("/") {
         if found_url.chars().nth(1).unwrap_or(' ') != '/' {
             parsed_found_url = original_url.clone();
-            parsed_found_url.set_path("/");
+            parsed_found_url.set_path(&found_url);
         } else if found_url.starts_with("//") {
             let mut modified_url = "https:".to_string();
             modified_url.push_str(&found_url);
@@ -35,21 +35,25 @@ pub fn repair_suggested_url(original_url: &Url, attribute: (&str, &str)) -> Opti
 
     let mut _returned_vec = vec![parsed_found_url.as_str().to_string()];
 
-    let main_domain = get_root_domain(parsed_found_url.as_str());
-    if main_domain != None {
-        _returned_vec.push(main_domain.unwrap());
+    let _main_domain = get_root_domain(parsed_found_url.as_str());
+    if _main_domain != None {
+        let main_domain = _main_domain.unwrap();
+
+        if main_domain != parsed_found_url.as_str() && main_domain != original_url.as_str() {
+            _returned_vec.push(main_domain);
+        }
     }
 
-    let returned_vec: Vec<String> = _returned_vec
-        .iter()
-        .map(|x| {
-            remove_get_params(Url::parse(x).unwrap())
-                .as_str()
-                .to_string()
-        })
-        .collect();
-
-    return Some(returned_vec);
+    return Some(
+        _returned_vec
+            .iter()
+            .map(|x| {
+                remove_get_params(Url::parse(x).unwrap())
+                    .as_str()
+                    .to_string()
+            })
+            .collect(),
+    );
 }
 
 static BLOCKED_GET_PARAMS: [&str; 34] = [
@@ -155,9 +159,9 @@ pub fn get_root_domain(url: &str) -> Option<String> {
             url
         );
         return None;
-    } else if hostname.unwrap().contains('.') {
+    } else if subdomainless_hostname.unwrap().contains('.') {
         let mut returned_url = parsed_url.clone();
-        let set_host_result = returned_url.set_host(Some(hostname.unwrap()));
+        let set_host_result = returned_url.set_host(Some(subdomainless_hostname.unwrap()));
         if set_host_result.is_err() {
             warn!(
                 "error setting host of {} to {}: {:?}",
@@ -222,7 +226,7 @@ mod tests {
         );
         assert_eq!(
             get_root_domain("https://test.test.test.domain/").unwrap(),
-            "https://test.domain/"
+            "https://test.test.domain/"
         );
     }
 
@@ -270,7 +274,9 @@ mod tests {
         );
         assert_eq!(
             repair_suggested_url(&url("https://google.com/test"), ("href", "/main")),
-            Some(vec!["https://google.com/main".to_string()])
+            Some(vec![
+                "https://google.com/main".to_string(),
+            ])
         );
         assert_eq!(
             repair_suggested_url(&url("https://google.com"), ("href", "./main")),
@@ -278,7 +284,7 @@ mod tests {
         );
         assert_eq!(
             repair_suggested_url(&url("https://google.com"), ("href", "//bing.com")),
-            Some(vec!["https://bing.com".to_string()])
+            Some(vec!["https://bing.com/".to_string()])
         );
         assert_eq!(
             repair_suggested_url(
@@ -286,8 +292,8 @@ mod tests {
                 ("href", "https://its.goggle.com")
             ),
             Some(vec![
-                "https://its.goggle.com".to_string(),
-                "https://goggle.com".to_string(),
+                "https://its.goggle.com/".to_string(),
+                "https://goggle.com/".to_string(),
             ])
         );
     }
