@@ -132,7 +132,7 @@ pub fn find_urls_in_html(
                 }
             }
             ParseError(error) => {
-                warn!("error parsing html for {}: {:?}", original_url, error);
+                debug!("error parsing html for {}: {:?}", original_url, error);
             }
             _ => {}
         }
