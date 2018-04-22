@@ -72,7 +72,6 @@ fn main() {
     let mut future_url_buffer: Vec<String> = vec![std::env::args().nth(1).unwrap().to_string()];
     let mut robots_cache: Vec<(String, RobotFileParser)> = Vec::new();
     let mut fetched_cache: Vec<String> = Vec::new();
-    let mut all_found_urls: Vec<String> = Vec::new();
 
     loop {
         future_urls = future_url_buffer.clone();
@@ -164,7 +163,6 @@ fn main() {
                                         .replace("\n", " "),
                                     meta
                                 );
-                                all_found_urls.append(&mut found_urls.1.clone());
                             }
                             _ => {
                                 println!("{}\t{}\t", url, text);
