@@ -274,9 +274,7 @@ mod tests {
         );
         assert_eq!(
             repair_suggested_url(&url("https://google.com/test"), ("href", "/main")),
-            Some(vec![
-                "https://google.com/main".to_string(),
-            ])
+            Some(vec!["https://google.com/main".to_string()])
         );
         assert_eq!(
             repair_suggested_url(&url("https://google.com"), ("href", "./main")),

@@ -72,7 +72,10 @@ pub fn find_urls_in_html(
                     let mut ok = false;
 
                     for attribute in tag.attrs.clone() {
-                        meta.push(((&attribute.name.local).to_string(), (&attribute.value).to_string()));
+                        meta.push((
+                            (&attribute.name.local).to_string(),
+                            (&attribute.value).to_string(),
+                        ));
                         if &attribute.name.local == "name"
                             && (attribute.value == Tendril::from_slice("robots")
                                 || attribute.value == Tendril::from_slice("twentiethbot"))

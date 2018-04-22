@@ -1,3 +1,4 @@
+extern crate ammonia;
 extern crate env_logger;
 extern crate html5ever;
 #[macro_use]
@@ -5,7 +6,6 @@ extern crate log;
 extern crate reqwest;
 extern crate robotparser;
 extern crate url;
-extern crate ammonia;
 
 use reqwest::Client;
 use robotparser::RobotFileParser;
@@ -30,8 +30,12 @@ fn crawl_page(
 
     if content_type == reqwest::mime::HTML {
         return Some(
-            html::find_urls_in_html(Url::parse(url).unwrap(), text, cache)
-                .unwrap_or((false, Vec::new(), "".to_string(), Vec::new())),
+            html::find_urls_in_html(Url::parse(url).unwrap(), text, cache).unwrap_or((
+                false,
+                Vec::new(),
+                "".to_string(),
+                Vec::new(),
+            )),
         );
     }
 
@@ -123,20 +127,43 @@ fn main() {
                 } else {
                     let mut response = response.unwrap();
                     let text = response.text().unwrap_or("???".to_string());
-                    let mut _found_urls =
-                        crawl_page(&url, &response.headers(), text.clone(), fetched_cache.clone());
+                    let mut _found_urls = crawl_page(
+                        &url,
+                        &response.headers(),
+                        text.clone(),
+                        fetched_cache.clone(),
+                    );
 
                     if _found_urls != None {
                         future_url_buffer.append(&mut _found_urls.clone().unwrap().1);
                     }
 
-                    let found_urls = _found_urls.unwrap_or((true, Vec::new(), "".to_string(), Vec::new()));
+                    let found_urls =
+                        _found_urls.unwrap_or((true, Vec::new(), "".to_string(), Vec::new()));
 
                     if found_urls.0 && response.status() == reqwest::StatusCode::Ok {
                         match found_urls.2.as_str() {
                             "html" => {
-                                let meta = found_urls.3.iter().map(|x| format!("{}={}", x.0, x.1)).collect::<Vec<String>>().join(";");
-                                println!("{}\t{}\t{}", url, ammonia::Builder::default().clean_content_tags(vec!["head", "style", "script"].into_iter().collect()).tags(std::collections::HashSet::new()).clean(&text).to_string().replace("\t", " ").replace("\n", " "), meta);
+                                let meta = found_urls
+                                    .3
+                                    .iter()
+                                    .map(|x| format!("{}={}", x.0, x.1))
+                                    .collect::<Vec<String>>()
+                                    .join(";");
+                                println!(
+                                    "{}\t{}\t{}",
+                                    url,
+                                    ammonia::Builder::default()
+                                        .clean_content_tags(
+                                            vec!["head", "style", "script"].into_iter().collect()
+                                        )
+                                        .tags(std::collections::HashSet::new())
+                                        .clean(&text)
+                                        .to_string()
+                                        .replace("\t", " ")
+                                        .replace("\n", " "),
+                                    meta
+                                );
                                 all_found_urls.append(&mut found_urls.1.clone());
                             }
                             _ => {
