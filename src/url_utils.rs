@@ -195,7 +195,6 @@ pub fn check_if_is_in_url_list(object: &str, array: &Vec<String>) -> bool {
     return true;
 }
 
-// =====================================================================[Tests]
 #[cfg(test)]
 mod tests {
     use url_utils::*;
