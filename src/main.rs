@@ -70,15 +70,17 @@ fn main() {
 }
 
 fn main_loop() {
-    _main_loop(std::env::args().nth(1).unwrap().to_string());
+    _main_loop(std::env::args().nth(1).unwrap().to_string(), true);
 }
 
-fn _main_loop(starton: String) {
+fn _main_loop(starton: String, panic: bool) -> Vec<String> {
     let client = Client::new();
     let mut future_urls: Vec<String>;
     let mut future_url_buffer: Vec<String> = Vec::new();
     let mut robots_cache: Vec<(String, RobotFileParser)> = Vec::new();
     let mut fetched_cache: Vec<String> = Vec::new();
+
+    #[allow(unused_mut)]
     let mut all_found_urls: Vec<String> = Vec::new();
 
     future_url_buffer.push(starton);
@@ -88,7 +90,11 @@ fn _main_loop(starton: String) {
         future_url_buffer = Vec::new();
 
         if future_urls.len() == 0 {
-            panic!("no more urls???");
+            if panic {
+                panic!("no more urls???");
+            } else {
+                return all_found_urls;
+            }
         }
 
         for url in future_urls {
@@ -173,11 +179,16 @@ fn _main_loop(starton: String) {
                                         .replace("\n", " "),
                                     meta
                                 );
-                                all_found_urls.append(&mut found_urls.1.clone());
                             }
                             _ => {
                                 println!("{}\t{}\t", url, text);
                             }
+                        }
+
+                        // Don't append unless we're testing to save memory
+                        #[cfg(test)]
+                        {
+                            all_found_urls.append(&mut found_urls.1.clone());
                         }
                     }
                 }
