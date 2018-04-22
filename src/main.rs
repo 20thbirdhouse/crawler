@@ -66,12 +66,21 @@ fn main() {
     env_logger::init();
     info!("crawler init!");
 
+    main_loop();
+}
+
+fn main_loop() {
+    _main_loop(std::env::args().nth(1).unwrap().to_string());
+}
+
+fn _main_loop(starton: String) {
     let client = Client::new();
     let mut future_urls: Vec<String>;
-
-    let mut future_url_buffer: Vec<String> = vec![std::env::args().nth(1).unwrap().to_string()];
+    let mut future_url_buffer: Vec<String> = Vec::new();
     let mut robots_cache: Vec<(String, RobotFileParser)> = Vec::new();
     let mut fetched_cache: Vec<String> = Vec::new();
+
+    future_url_buffer.push(starton);
 
     loop {
         future_urls = future_url_buffer.clone();
