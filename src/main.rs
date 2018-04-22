@@ -79,6 +79,7 @@ fn _main_loop(starton: String) {
     let mut future_url_buffer: Vec<String> = Vec::new();
     let mut robots_cache: Vec<(String, RobotFileParser)> = Vec::new();
     let mut fetched_cache: Vec<String> = Vec::new();
+    let mut all_found_urls: Vec<String> = Vec::new();
 
     future_url_buffer.push(starton);
 
@@ -172,6 +173,7 @@ fn _main_loop(starton: String) {
                                         .replace("\n", " "),
                                     meta
                                 );
+                                all_found_urls.append(&mut found_urls.1.clone());
                             }
                             _ => {
                                 println!("{}\t{}\t", url, text);
