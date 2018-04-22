@@ -71,11 +71,15 @@ pub fn find_urls_in_html(
                 if &tag.name == "meta" && (tag.kind == StartTag || tag.self_closing) {
                     let mut ok = false;
 
+                    let mut found_meta = ("".to_string(), "".to_string());
                     for attribute in tag.attrs.clone() {
-                        meta.push((
-                            (&attribute.name.local).to_string(),
-                            (&attribute.value).to_string(),
-                        ));
+                        // TODO Use match {}
+                        if &attribute.name.local == "name" {
+                            found_meta.0 = (&attribute.value).to_string();
+                        } else if &attribute.name.local == "content" {
+                            found_meta.1 = (&attribute.value).to_string();
+                        }
+
                         if &attribute.name.local == "name"
                             && (attribute.value == Tendril::from_slice("robots")
                                 || attribute.value == Tendril::from_slice("twentiethbot"))
@@ -83,6 +87,8 @@ pub fn find_urls_in_html(
                             ok = true;
                         }
                     }
+
+                    meta.push(found_meta);
 
                     if !ok {
                         continue;
