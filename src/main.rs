@@ -127,14 +127,20 @@ fn main() {
                         crawl_page(&url, &response.headers(), text.clone(), fetched_cache.clone());
 
                     if _found_urls != None {
-                        let mut found_urls = _found_urls.unwrap();
-                        future_url_buffer.append(&mut found_urls.1);
+                        future_url_buffer.append(&mut _found_urls.clone().unwrap().1);
+                    }
 
-                        if found_urls.0 && response.status() == reqwest::StatusCode::Ok {
-                            if found_urls.2 == "html" {
+                    let found_urls = _found_urls.unwrap_or((true, Vec::new(), "".to_string(), Vec::new()));
+
+                    if found_urls.0 && response.status() == reqwest::StatusCode::Ok {
+                        match found_urls.2.as_str() {
+                            "html" => {
                                 let meta = found_urls.3.iter().map(|x| format!("{}={}", x.0, x.1)).collect::<Vec<String>>().join(";");
                                 println!("{}\t{}\t{}", url, ammonia::Builder::default().clean_content_tags(vec!["head", "style", "script"].into_iter().collect()).tags(std::collections::HashSet::new()).clean(&text).to_string().replace("\t", " ").replace("\n", " "), meta);
                                 all_found_urls.append(&mut found_urls.1.clone());
+                            }
+                            _ => {
+                                println!("{}\t{}\t", url, text);
                             }
                         }
                     }
