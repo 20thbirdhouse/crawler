@@ -7,6 +7,10 @@ extern crate reqwest;
 extern crate robotparser;
 extern crate url;
 
+// see issue #7
+//#[cfg(test)]
+//extern crate iron;
+
 use reqwest::Client;
 use robotparser::RobotFileParser;
 use url::Url;
@@ -74,6 +78,7 @@ fn main_loop() {
 }
 
 fn _main_loop(starton: String, panic: bool) -> Vec<String> {
+    // see issue #7
     let client = Client::new();
     let mut future_urls: Vec<String>;
     let mut future_url_buffer: Vec<String> = Vec::new();
@@ -197,4 +202,46 @@ fn _main_loop(starton: String, panic: bool) -> Vec<String> {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    // see issue #7
+    //use iron::{Iron, IronResult, Headers};
+    //use iron::response::Response;
+    //use iron::request::Request;
+    //use iron::status;
+    //use iron::middleware::Chain;
+    //use iron::headers::ContentType;
+    //use iron::mime::{Mime, TopLevel, SubLevel};
+    //use iron::typemap::TypeMap;
+    use std;
+
+    use ::*;
+
+    // see issue #7
+    //#[test]
+    //fn __main_loop() {
+    //    fn handler(req: &mut Request) -> IronResult<Response> {
+    //        let mut mime = Headers::new();
+    //        mime.set(ContentType(Mime(TopLevel::Text, SubLevel::Html, Vec::new())));
+
+    //        Ok(Response {
+    //            headers: mime,
+    //            status: Some(status::Ok),
+    //            body: Some(Box::new(match req.url.path().join("/").as_str() {
+    //                "" => "<a href='file'></a><a href='file1'></a>",
+    //                "file" => "<a href='/file1'></a>",
+    //                "file1" => "<a href='/file'></a>",
+    //                _ => "not found"
+    //            })),
+    //            extensions: TypeMap::new()
+    //        })
+    //    }
+
+    //    let child = std::thread::spawn(|| Iron::new(Chain::new(handler)).http("localhost:9999").unwrap());
+
+    //    let f: Vec<String> = Vec::new();
+    //    assert_eq!(_main_loop("http://localhost:9999/".to_string(), false), f);
+    //}
 }
