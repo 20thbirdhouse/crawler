@@ -140,3 +140,87 @@ pub fn find_urls_in_html(
 
     return Some((index_url, found_urls, "html".to_string(), meta));
 }
+
+#[cfg(test)]
+mod tests {
+    use html::*;
+
+    #[test]
+    fn _get_attribute_for_elem() {
+        assert_eq!(get_attribute_for_elem("a"), Some("href"));
+        assert_eq!(get_attribute_for_elem("script"), Some("src"));
+        assert_eq!(get_attribute_for_elem("link"), Some("href"));
+        assert_eq!(get_attribute_for_elem("img"), Some("src"));
+        assert_eq!(get_attribute_for_elem("iframe"), Some("src"));
+        assert_eq!(get_attribute_for_elem("amp-img"), Some("src"));
+        assert_eq!(get_attribute_for_elem("amp-anim"), Some("src"));
+        assert_eq!(get_attribute_for_elem("amp-video"), Some("src"));
+        assert_eq!(get_attribute_for_elem("amp-audio"), Some("src"));
+        assert_eq!(get_attribute_for_elem("amp-iframe"), Some("src"));
+        assert_eq!(get_attribute_for_elem("p"), None);
+    }
+
+    #[test]
+    fn _html_token_sink() {
+        let mut result = Vec::new();
+
+        {
+            let mut sink = HtmlTokenSink(&mut result);
+
+            assert_eq!(sink.0.len(), 0);
+            assert_eq!(sink.process_token(EOFToken, 0), TokenSinkResult::Continue);
+            assert_eq!(sink.0.len(), 1);
+        }
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], EOFToken);
+    }
+
+    #[test]
+    fn _find_urls_in_html() {
+        #[allow(non_snake_case)]
+        fn S(inp: &str) -> String {
+            inp.to_string()
+        }
+
+        let orig = Url::parse("https://google.com/").unwrap();
+        assert_eq!(
+            find_urls_in_html(
+                orig.clone(),
+                S("<a href='news'></a><a href='gmail'></a>"),
+                Vec::new()
+            ),
+            Some((
+                true,
+                vec![S("https://google.com/news"), S("https://google.com/gmail")],
+                S("html"),
+                Vec::new()
+            ))
+        );
+        assert_eq!(
+            find_urls_in_html(
+                orig.clone(),
+                S("<meta name='terminator' content='destroy' />"),
+                Vec::new()
+            ),
+            Some((
+                true,
+                Vec::new(),
+                S("html"),
+                vec![(S("terminator"), S("destroy"))]
+            ))
+        );
+        assert_eq!(
+            find_urls_in_html(
+                orig.clone(),
+                S("<a href='news'></a><a href='gmail'></a>"),
+                vec![S("https://google.com/news")]
+            ),
+            Some((
+                true,
+                vec![S("https://google.com/gmail")],
+                S("html"),
+                Vec::new()
+            ))
+        );
+    }
+}
