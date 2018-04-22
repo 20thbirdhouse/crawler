@@ -61,7 +61,7 @@ fn find_in_robot_cache<'a>(
 
 fn main() {
     // subtract 1 to account for argv[0]
-    assert_eq!(std::env::args().count() - 1, 2, "not enough arguments");
+    assert_eq!(std::env::args().count() - 1, 1, "not enough arguments");
 
     env_logger::init();
     info!("crawler init!");
