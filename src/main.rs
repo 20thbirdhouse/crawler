@@ -215,7 +215,6 @@ mod tests {
     //use iron::headers::ContentType;
     //use iron::mime::{Mime, TopLevel, SubLevel};
     //use iron::typemap::TypeMap;
-    use std;
 
     use ::*;
 
