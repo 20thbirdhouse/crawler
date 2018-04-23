@@ -244,4 +244,57 @@ mod tests {
     //    let f: Vec<String> = Vec::new();
     //    assert_eq!(_main_loop("http://localhost:9999/".to_string(), false), f);
     //}
+
+    #[test]
+    fn _find_in_robot_cache() {
+        let mut fake_cache = Vec::new();
+        assert_eq!(
+            find_in_robot_cache("https://google.com", fake_cache.clone()),
+            None
+        );
+        fake_cache.push((
+            "https://google.com".to_string(),
+            RobotFileParser::new("https://google.com/robots.txt"),
+        ));
+        assert_eq!(
+            find_in_robot_cache("https://google.com", fake_cache),
+            Some((
+                "https://google.com".to_string(),
+                RobotFileParser::new("https://google.com/robots.txt")
+            ))
+        );
+    }
+
+    #[test]
+    fn _crawl_page() {
+        #[allow(non_snake_case)]
+        fn S(inp: &str) -> String {
+            return inp.to_string();
+        }
+
+        let mut headers = reqwest::header::Headers::new();
+        headers.set(reqwest::header::ContentType::html());
+        assert_eq!(
+            crawl_page(
+                "https://google.com",
+                &headers,
+                S("<a href='news'></a><a href='gmail'></a>"),
+                Vec::new()
+            ),
+            html::find_urls_in_html(
+                Url::parse("https://google.com/").unwrap(),
+                S("<a href='news'></a><a href='gmail'></a>"),
+                Vec::new()
+            )
+        );
+        assert_eq!(
+            crawl_page(
+                "https://google.com",
+                &reqwest::header::Headers::new(),
+                S("dummy text"),
+                Vec::new()
+            ),
+            None
+        );
+    }
 }
