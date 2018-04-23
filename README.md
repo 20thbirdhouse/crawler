@@ -1,4 +1,4 @@
-# crawler
+# crawler [![Travis](https://img.shields.io/travis/20thbirdhouse/crawler.svg)](https://travis-ci.org/20thbirdhouse/crawler)
 `crawler` is a web-crawler for the 20<sup>th</sup> Birdhouse project. It scans
 the Web (or theoretically every protocol supported by 
 [reqwest](https://github.com/seanmonstar/reqwest)) for URLs, and parses HTML
